@@ -271,7 +271,7 @@
     <!-- Step 3: Excel Import Teams -->
     <div class="card">
       <h2>3. Teams Importeren (Excel / CSV uit Orderbilly)</h2>
-      <p style="font-size: 0.85rem; color: var(--subtext);">Upload een Excel-bestand met kolommen: <b>Tafelnummer</b>, <b>Ploegnaam</b>, <b>Aantal Deelnemers</b></p>
+      <p style="font-size: 0.85rem; color: var(--subtext);">Upload een Excel-bestand met kolommen op rij 1: <b>Tafelnummer</b>, <b>Ploegnaam</b>, <b>Aantal Deelnemers</b></p>
       <input type="file" id="excel-file" accept=".xlsx, .xls, .csv" onchange="importExcel(event)">
       <p id="import-status" style="font-size: 0.85rem; color: #10b981; margin-top: 0.5rem;"></p>
     </div>
@@ -279,11 +279,14 @@
     <!-- Step 4: Punten & Schifting Invoeren -->
     <div class="card">
       <h2>4. Score Invoer</h2>
-      <div style="display: flex; gap: 1rem; align-items: center;">
-        <label style="margin:0;">Selecteer Ronde:</label>
-        <select id="select-round" style="width: 250px;" onchange="renderScoreInputTable()">
-          <!-- Dynamic Options -->
-        </select>
+      <div style="display: flex; gap: 1rem; align-items: center; justify-content: space-between;">
+        <div style="display: flex; gap: 1rem; align-items: center;">
+          <label style="margin:0;">Selecteer Ronde:</label>
+          <select id="select-round" style="width: 250px;" onchange="renderScoreInputTable()">
+            <!-- Dynamic Options -->
+          </select>
+        </div>
+        <button class="btn-danger" onclick="resetAllScores()" style="width: auto; padding: 0.5rem 1rem;">⚠️ Reset Alle Punten & Scores</button>
       </div>
 
       <table id="table-score-input">
@@ -540,15 +543,45 @@
             <td>${t.name}</td>
             <td>${t.members}</td>
             <td>
-              <input type="number" step="0.01" value="${t.tiebreaker || ''}" onchange="teams[${idx}].tiebreaker = parseFloat(this.value); saveLocalState();">
+              <input type="number" step="0.01" value="${t.tiebreaker || ''}" onchange="updateTeamTiebreaker(${idx}, this.value)">
             </td>
             <td>
-              <input type="number" class="score-input" value="${t.scores[currentRoundId] ?? ''}" onchange="teams[${idx}].scores[${currentRoundId}] = parseFloat(this.value) || 0; saveLocalState();">
+              <input type="number" class="score-input" value="${t.scores[currentRoundId] ?? ''}" oninput="updateTeamScore(${idx}, ${currentRoundId}, this.value)">
             </td>
-            <td><b>${totalSoFar} pt</b></td>
+            <td><b id="total-team-${idx}">${totalSoFar} pt</b></td>
           </tr>
         `;
       });
+    }
+
+    function updateTeamScore(teamIdx, roundId, val) {
+      teams[teamIdx].scores[roundId] = val === '' ? 0 : parseFloat(val) || 0;
+      
+      // Live Recalculate Total Column
+      const totalSoFar = Object.values(teams[teamIdx].scores).reduce((a, b) => a + (parseFloat(b) || 0), 0);
+      const totalCell = document.getElementById(`total-team-${teamIdx}`);
+      if (totalCell) {
+        totalCell.innerText = `${totalSoFar} pt`;
+      }
+
+      saveLocalState();
+    }
+
+    function updateTeamTiebreaker(teamIdx, val) {
+      teams[teamIdx].tiebreaker = parseFloat(val) || 0;
+      saveLocalState();
+    }
+
+    function resetAllScores() {
+      if (confirm("⚠️ Ben je zeker dat je ALLE ingevoerde scores en schiftingsgokken van de teams wilt wissen?\n\nDit kan niet ongedaan gemaakt worden.")) {
+        teams.forEach(t => {
+          t.scores = {};
+          t.tiebreaker = 0;
+        });
+        renderScoreInputTable();
+        saveLocalState();
+        alert("Alle punten zijn blanco gezet!");
+      }
     }
 
     // --- FIREBASE CLOUD SYNC ---
@@ -677,7 +710,6 @@
     function getEligibleTeamsForWheel() {
       if (teams.length === 0) return [];
 
-      // Sort teams to find Top 5
       let sorted = teams.map(t => {
         const total = Object.values(t.scores).reduce((a, b) => a + (parseFloat(b) || 0), 0);
         const diff = Math.abs((parseFloat(t.tiebreaker) || 0) - quizConfig.tiebreakerAnswer);
@@ -689,10 +721,7 @@
         return a.diff - b.diff;
       });
 
-      // Top 5 excluded
       const top5Names = sorted.slice(0, 5).map(t => t.name);
-
-      // Return remaining teams that haven't won yet
       return teams.filter(t => !top5Names.includes(t.name) && !wheelWinners.includes(t.name));
     }
 
@@ -709,38 +738,32 @@
       btn.disabled = true;
       display.classList.remove('winner');
 
-      // Pick winner in advance
       const winningTeam = eligible[Math.floor(Math.random() * eligible.length)];
 
-      let speed = 50; // Initial speed in ms
-      const duration = 5000; // Total duration 5 seconds
+      let speed = 50;
+      const duration = 5000;
       const startTime = Date.now();
 
       function step() {
         const elapsed = Date.now() - startTime;
         
         if (elapsed < duration) {
-          // Show random team during spin
           const randomTemp = eligible[Math.floor(Math.random() * eligible.length)];
           display.innerText = randomTemp.name;
 
-          // Gradually increase delay (slow down)
           const progress = elapsed / duration;
-          speed = 50 + Math.pow(progress, 3) * 450; // Exponential deceleration
+          speed = 50 + Math.pow(progress, 3) * 450;
 
           setTimeout(step, speed);
         } else {
-          // Finish Spin
           display.innerText = `🎉 ${winningTeam.name} 🎉`;
           display.classList.add('winner');
           btn.disabled = false;
 
-          // Add to winner list
           wheelWinners.push(winningTeam.name);
           renderWheelWinners();
           saveLocalState();
 
-          // Confetti Explosion
           confetti({
             particleCount: 120,
             spread: 80,
