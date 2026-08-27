@@ -4,10 +4,11 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Quiz Scouts Diependaal 2026</title>
-  <!-- XLSX & Firebase SDKs -->
+  <!-- XLSX, Firebase & Canvas Confetti SDKs -->
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
   <style>
     :root {
       --bg: #0f172a;
@@ -26,6 +27,7 @@
       color: var(--text);
       margin: 0;
       padding: 0;
+      overflow-x: hidden;
     }
     nav {
       background: var(--card);
@@ -138,6 +140,83 @@
     .rank-1 { color: #facc15; font-weight: bold; font-size: 1.6rem; }
     .rank-2 { color: #cbd5e1; font-weight: bold; }
     .rank-3 { color: #b45309; font-weight: bold; }
+
+    /* RAD VAN FORTUIN STYLES */
+    .wheel-view {
+      display: none;
+      background: radial-gradient(circle, #1e1b4b 0%, #0f172a 100%);
+      min-height: 100vh;
+      padding: 2rem;
+      text-align: center;
+    }
+    .wheel-box {
+      background: rgba(15, 23, 42, 0.8);
+      border: 4px solid var(--gold);
+      border-radius: 24px;
+      padding: 3rem 2rem;
+      max-width: 900px;
+      margin: 2rem auto;
+      box-shadow: 0 0 50px rgba(245, 158, 11, 0.3);
+    }
+    .wheel-display {
+      font-size: 4rem;
+      font-weight: 900;
+      min-height: 180px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #ffffff;
+      text-shadow: 0 0 20px var(--accent);
+      background: #020617;
+      border-radius: 16px;
+      border: 2px solid var(--accent);
+      margin: 2rem 0;
+      padding: 1rem;
+      word-break: break-word;
+    }
+    .wheel-display.winner {
+      color: var(--gold);
+      border-color: var(--gold);
+      text-shadow: 0 0 30px #f59e0b, 0 0 60px #f59e0b;
+      animation: pulse 1s infinite alternate;
+    }
+    @keyframes pulse {
+      0% { transform: scale(1); }
+      100% { transform: scale(1.03); }
+    }
+    .wheel-btn {
+      background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+      color: #000;
+      font-size: 2rem;
+      font-weight: 900;
+      padding: 1.2rem 3rem;
+      border-radius: 50px;
+      border: none;
+      cursor: pointer;
+      box-shadow: 0 10px 25px rgba(245, 158, 11, 0.4);
+      transition: all 0.2s ease;
+      width: auto;
+      display: inline-block;
+    }
+    .wheel-btn:hover {
+      transform: translateY(-3px);
+      box-shadow: 0 15px 35px rgba(245, 158, 11, 0.6);
+    }
+    .wheel-btn:disabled {
+      background: #475569;
+      color: #94a3b8;
+      box-shadow: none;
+      cursor: not-allowed;
+      transform: none;
+    }
+    .winners-list {
+      margin-top: 2rem;
+      text-align: left;
+      background: #090d16;
+      padding: 1rem 1.5rem;
+      border-radius: 12px;
+      border: 1px solid var(--border);
+    }
   </style>
 </head>
 <body>
@@ -147,6 +226,7 @@
     <div class="nav-btns">
       <button id="btn-admin" class="active" onclick="showTab('admin')">Beheerders Dashboard</button>
       <button id="btn-projector" onclick="showTab('projector')">Projectiescherm (Live)</button>
+      <button id="btn-wheel" onclick="showTab('wheel')">Rad van Fortuin 🎰</button>
     </div>
   </nav>
 
@@ -235,7 +315,6 @@
   <!-- PROJECTIESCHERM VIEW -->
   <div id="tab-projector" class="projection-view">
     
-    <!-- Controls overlay for auto-scroll on projection screen -->
     <div class="projector-controls">
       <button id="btn-autoscroll" class="btn-secondary" onclick="toggleAutoScroll()">Start Auto-Scroll</button>
       <button class="btn-secondary" onclick="showTab('admin')">Sluit Projectie</button>
@@ -263,6 +342,37 @@
     </table>
   </div>
 
+  <!-- RAD VAN FORTUIN VIEW -->
+  <div id="tab-wheel" class="wheel-view">
+    <div class="projector-controls">
+      <button class="btn-secondary" onclick="showTab('admin')">Terug naar Beheer</button>
+    </div>
+
+    <div class="projection-header">
+      <h1>Quiz Scouts Diependaal 2026</h1>
+      <p style="color: var(--gold); font-size: 2rem; margin-top: 0.5rem; font-weight: bold;">🎰 RAD VAN FORTUIN - PRIJZEN 🎰</p>
+    </div>
+
+    <div class="wheel-box">
+      <p style="font-size: 1.2rem; color: var(--subtext); margin: 0;">Exclusief Top 5 van het klassement</p>
+      
+      <div id="wheel-display" class="wheel-display">
+        Klik op de knop om te starten!
+      </div>
+
+      <button id="btn-spin" class="wheel-btn" onclick="spinWheel()">DRAAI HET RAD!</button>
+      <br><br>
+      <button class="btn-secondary" onclick="resetWheel()" style="width: auto; padding: 0.5rem 1.5rem; margin-top: 1rem;">Reset Gewonnen Ploegen</button>
+
+      <div class="winners-list">
+        <h3 style="margin-top:0; color: var(--gold);">Reeds Gewonnen Ploegen:</h3>
+        <ol id="wheel-winners-list" style="margin:0; padding-left: 1.2rem; color: var(--text);">
+          <!-- Dynamic Winner List -->
+        </ol>
+      </div>
+    </div>
+  </div>
+
   <script>
     // App State
     let quizConfig = {
@@ -283,8 +393,9 @@
     let db = null;
     let autoScrollInterval = null;
     let isScrollingDown = true;
+    let wheelWinners = [];
 
-    // --- LOCALSTORAGE LOGIC (ONTHOUDT ALLES NALATIGS) ---
+    // --- LOCALSTORAGE LOGIC ---
     function saveLocalState() {
       const apiKey = document.getElementById('cfg-apikey').value;
       const projectId = document.getElementById('cfg-projectid').value;
@@ -296,7 +407,8 @@
         apiKey,
         projectId,
         quizConfig,
-        teams
+        teams,
+        wheelWinners
       };
       localStorage.setItem('quizScoutsDiependaalState', JSON.stringify(state));
     }
@@ -315,6 +427,10 @@
           if (parsed.teams) {
             teams = parsed.teams;
             document.getElementById('import-status').innerText = `Geladen uit geheugen: ${teams.length} teams gereed!`;
+          }
+          if (parsed.wheelWinners) {
+            wheelWinners = parsed.wheelWinners;
+            renderWheelWinners();
           }
         } catch (e) {
           console.error("Fout bij het laden van lokale gegevens", e);
@@ -458,7 +574,6 @@
       }
       db = firebase.firestore();
 
-      // Listen for Live Updates
       db.collection("quiz").doc("liveData").onSnapshot((doc) => {
         if (doc.exists) {
           const data = doc.data();
@@ -485,7 +600,7 @@
       });
     }
 
-    // --- PROJECTOR & TIEBREAKER LOGIC ---
+    // --- PROJECTOR LOGIC ---
     function renderProjectorRanking(incomingTeams, config) {
       const tbody = document.getElementById('tbody-ranking');
       tbody.innerHTML = '';
@@ -543,18 +658,115 @@
 
           if (isScrollingDown) {
             if (currentScroll >= maxScroll - 5) {
-              isScrollingDown = false; // Turn around at bottom
+              isScrollingDown = false;
             } else {
               window.scrollBy(0, 2);
             }
           } else {
             if (currentScroll <= 5) {
-              isScrollingDown = true; // Turn around at top
+              isScrollingDown = true;
             } else {
               window.scrollBy(0, -2);
             }
           }
-        }, 40); // Controls scrolling speed
+        }, 40);
+      }
+    }
+
+    // --- RAD VAN FORTUIN LOGIC ---
+    function getEligibleTeamsForWheel() {
+      if (teams.length === 0) return [];
+
+      // Sort teams to find Top 5
+      let sorted = teams.map(t => {
+        const total = Object.values(t.scores).reduce((a, b) => a + (parseFloat(b) || 0), 0);
+        const diff = Math.abs((parseFloat(t.tiebreaker) || 0) - quizConfig.tiebreakerAnswer);
+        return { ...t, total, diff };
+      });
+
+      sorted.sort((a, b) => {
+        if (b.total !== a.total) return b.total - a.total;
+        return a.diff - b.diff;
+      });
+
+      // Top 5 excluded
+      const top5Names = sorted.slice(0, 5).map(t => t.name);
+
+      // Return remaining teams that haven't won yet
+      return teams.filter(t => !top5Names.includes(t.name) && !wheelWinners.includes(t.name));
+    }
+
+    function spinWheel() {
+      const eligible = getEligibleTeamsForWheel();
+      const display = document.getElementById('wheel-display');
+      const btn = document.getElementById('btn-spin');
+
+      if (eligible.length === 0) {
+        alert("Er zijn geen beschikbare ploegen meer om te trekken (of geen teams geïmporteerd)!");
+        return;
+      }
+
+      btn.disabled = true;
+      display.classList.remove('winner');
+
+      // Pick winner in advance
+      const winningTeam = eligible[Math.floor(Math.random() * eligible.length)];
+
+      let speed = 50; // Initial speed in ms
+      const duration = 5000; // Total duration 5 seconds
+      const startTime = Date.now();
+
+      function step() {
+        const elapsed = Date.now() - startTime;
+        
+        if (elapsed < duration) {
+          // Show random team during spin
+          const randomTemp = eligible[Math.floor(Math.random() * eligible.length)];
+          display.innerText = randomTemp.name;
+
+          // Gradually increase delay (slow down)
+          const progress = elapsed / duration;
+          speed = 50 + Math.pow(progress, 3) * 450; // Exponential deceleration
+
+          setTimeout(step, speed);
+        } else {
+          // Finish Spin
+          display.innerText = `🎉 ${winningTeam.name} 🎉`;
+          display.classList.add('winner');
+          btn.disabled = false;
+
+          // Add to winner list
+          wheelWinners.push(winningTeam.name);
+          renderWheelWinners();
+          saveLocalState();
+
+          // Confetti Explosion
+          confetti({
+            particleCount: 120,
+            spread: 80,
+            origin: { y: 0.6 }
+          });
+        }
+      }
+
+      step();
+    }
+
+    function renderWheelWinners() {
+      const list = document.getElementById('wheel-winners-list');
+      list.innerHTML = '';
+      wheelWinners.forEach(w => {
+        list.innerHTML += `<li><b>${w}</b></li>`;
+      });
+    }
+
+    function resetWheel() {
+      if (confirm("Weet je zeker dat je de lijst met gewonnen ploegen wil wissen?")) {
+        wheelWinners = [];
+        renderWheelWinners();
+        saveLocalState();
+        document.getElementById('wheel-display').innerText = "Klaar voor een nieuwe trekking!";
+        document.getElementById('wheel-display').classList.remove('winner');
       }
     }
 
@@ -590,9 +802,13 @@
     function showTab(tab) {
       document.getElementById('tab-admin').style.display = tab === 'admin' ? 'block' : 'none';
       document.getElementById('tab-projector').style.display = tab === 'projector' ? 'block' : 'none';
-      document.getElementById('top-nav').style.display = tab === 'projector' ? 'none' : 'flex';
+      document.getElementById('tab-wheel').style.display = tab === 'wheel' ? 'block' : 'none';
+      
+      document.getElementById('top-nav').style.display = (tab === 'projector' || tab === 'wheel') ? 'none' : 'flex';
+      
       document.getElementById('btn-admin').classList.toggle('active', tab === 'admin');
       document.getElementById('btn-projector').classList.toggle('active', tab === 'projector');
+      document.getElementById('btn-wheel').classList.toggle('active', tab === 'wheel');
     }
 
     // --- INITIAL LOAD ---
