@@ -585,37 +585,102 @@
     }
 
     // --- FIREBASE CLOUD SYNC ---
-    function initFirebase() {
-      const apiKey = document.getElementById('cfg-apikey').value;
-      const projectId = document.getElementById('cfg-projectid').value;
+    ```javascript
+function initFirebase() {
+  const apiKey = document.getElementById('cfg-apikey').value.trim();
+  const projectId = document.getElementById('cfg-projectid').value.trim();
 
-      if (!apiKey || !projectId) {
-        alert("Vul de Firebase API Key en Project ID in.");
-        return;
-      }
+  if (!apiKey || !projectId) {
+    alert("Vul de Firebase API Key en Project ID in.");
+    return;
+  }
 
-      saveLocalState();
+  saveLocalState();
 
-      const firebaseConfig = {
-        apiKey: apiKey,
-        authDomain: `${projectId}.firebaseapp.com`,
-        projectId: projectId
-      };
+  const firebaseConfig = {
+    apiKey: apiKey,
+    authDomain: `${projectId}.firebaseapp.com`,
+    projectId: projectId
+  };
 
-      if (!firebase.apps.length) {
-        firebase.initializeApp(firebaseConfig);
-      }
-      db = firebase.firestore();
-
-      db.collection("quiz").doc("liveData").onSnapshot((doc) => {
-        if (doc.exists) {
-          const data = doc.data();
-          renderProjectorRanking(data.teams, data.config);
-        }
-      });
-
-      alert("Succesvol verbonden met Firebase Cloud!");
+  try {
+    if (!firebase.apps.length) {
+      firebase.initializeApp(firebaseConfig);
     }
+
+    db = firebase.firestore();
+
+    db.collection("quiz").doc("liveData").onSnapshot(
+      (doc) => {
+        if (!doc.exists) {
+          console.warn("Het document quiz/liveData bestaat nog niet.");
+          alert(
+            "Er is verbinding met Firebase, maar er staan nog geen quizgegevens in de cloud."
+          );
+          return;
+        }
+
+        const data = doc.data();
+
+        if (
+          !Array.isArray(data.teams) ||
+          !data.config ||
+          !Array.isArray(data.config.rounds)
+        ) {
+          console.error("Ongeldige quizgegevens in Firebase:", data);
+          alert("De gegevens in Firebase hebben niet de verwachte structuur.");
+          return;
+        }
+
+        // Neem de teams en quizconfiguratie over uit Firebase.
+        teams = data.teams;
+        quizConfig = data.config;
+
+        // Werk de lokale opslag bij met de ontvangen gegevens.
+        saveLocalState();
+
+        // Vernieuw het beheerdersdashboard.
+        renderRoundsConfig();
+        renderScoreInputTable();
+        renderWheelWinners();
+
+        // Vernieuw ook het projectiescherm.
+        renderProjectorRanking(teams, quizConfig);
+
+        // Toon hoeveel gegevens zijn ingeladen.
+        document.getElementById('import-status').innerText =
+          `Geladen uit Firebase: ${teams.length} teams en ` +
+          `${quizConfig.rounds.length} rondes.`;
+
+        console.log("Quizgegevens geladen uit Firebase.", {
+          aantalTeams: teams.length,
+          aantalRondes: quizConfig.rounds.length
+        });
+      },
+      (error) => {
+        console.error("Fout bij het uitlezen van Firebase:", error);
+
+        alert(
+          "De quizgegevens konden niet uit Firebase worden gelezen.\n\n" +
+          "Foutcode: " + (error.code || "onbekend") + "\n" +
+          "Melding: " + (error.message || "Geen verdere informatie")
+        );
+      }
+    );
+
+    alert("Verbinding met Firebase gestart. De quizgegevens worden ingeladen.");
+
+  } catch (error) {
+    console.error("Fout bij het verbinden met Firebase:", error);
+
+    alert(
+      "Verbinding met Firebase mislukt.\n\n" +
+      "Melding: " + (error.message || "Geen verdere informatie")
+    );
+  }
+}
+```
+
 
     
     async function saveScoresToCloud() {
