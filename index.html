@@ -617,20 +617,46 @@
       alert("Succesvol verbonden met Firebase Cloud!");
     }
 
-    function saveScoresToCloud() {
-      saveLocalState();
-      if (!db) {
-        alert("Gegevens lokaal opgeslagen! Verbind met Firebase om live naar het projectiescherm te syncen.");
-        return;
-      }
+    
+    async function saveScoresToCloud() {
+      console.log("Synchronisatie gestart.");
 
-      db.collection("quiz").doc("liveData").set({
-        teams: teams,
-        config: quizConfig,
-        updatedAt: new Date()
-      }).then(() => {
-        alert("Scores gesynchroniseerd met het projectiescherm!");
-      });
+      try {
+        saveLocalState();
+
+        if (!db) {
+          alert("Niet verbonden met Firebase. Klik eerst op 'Verbind met Cloud Database'.");
+          return;
+        }
+
+        const docRef = db.collection("quiz").doc("liveData");
+
+        await docRef.set({
+          teams: teams,
+          config: quizConfig,
+          updatedAt: new Date()
+        });
+
+        console.log("Synchronisatie geslaagd.", {
+          aantalTeams: teams.length,
+          aantalRondes: quizConfig.rounds.length
+        });
+
+        alert(
+          "Synchronisatie geslaagd!\n\n" +
+          teams.length + " teams en " +
+          quizConfig.rounds.length + " rondes opgeslagen in Firebase."
+        );
+
+      } catch (error) {
+        console.error("Fout bij synchronisatie:", error);
+
+        alert(
+          "Synchronisatie mislukt.\n\n" +
+          "Foutcode: " + (error.code || "onbekend") + "\n" +
+          "Melding: " + (error.message || "Geen verdere informatie")
+        );
+      }
     }
 
     // --- PROJECTOR LOGIC ---
